@@ -1,55 +1,65 @@
 import { Component } from "react";
-import ContactForm from "./ContactForm";
-import ContactList from "./ContactList";
-import classes from "./App.module.css"
-import Filter from "./Filter";
-
+import { ToastContainer } from 'react-toastify';
+import { fetchImages, pageSize } from "../services/api";
+import SearchBar from "./SearchBar";
+import ImageGallery from "./ImageGallery";
+import Button from "./Button";
+import classes from './App.module.css'
 export class App extends Component {
   state = {
-    contacts: [
-      {id: 'id-1', name: 'Rosie Simpson', number: '459-12-56'},
-      {id: 'id-2', name: 'Hermione Kline', number: '443-89-12'},
-      {id: 'id-3', name: 'Eden Clements', number: '645-17-79'},
-      {id: 'id-4', name: 'Annie Copeland', number: '227-91-26'},
-    ],
-    filter: '',
-  }
-  handleSubmit = values => {
-    const contacts = this.state.contacts;
-    if (contacts.find(contact => contact.name === values.name)) {
-      alert(`${values.name} is already in contacts !!!`);
-      return;
+    searchName: '',
+    isLoading: false,
+    currentPage: 1,
+    items: [],
+    error: null,
+    totalHits: null,
+  };
+   componentDidUpdate(prevProps, prevState) {  
+    const { searchName, currentPage } = this.state;
+
+    if (prevState.searchName !== searchName ||
+      prevState.currentPage !== currentPage) {
+      this.setState({ isLoading: true });
+
+      fetchImages({ searchName, currentPage })
+        .then(data => { 
+          this.setState((prevState) =>
+          ({
+            isLoading: false,
+            items: data.hits.length ? [...prevState.items, ...data.hits] : [],
+            totalHits: data.totalHits,
+          })
+          )
+        }
+        )
+        .catch(error=> this.setState({error}))
+        .finally(() => {
+          this.setState({ isLoading: false });
+        });
     }
-    this.setState({ contacts: [values, ...contacts] });
   };
 
-  handlerDelete = contactId => {
-    this.setState({ contacts: [...this.state.contacts.filter(item => item.id !== contactId)] });
+  handleSubmit = (value) => {
+    this.setState({searchName: value });
+  
   };
 
-  handleFilter = value => {
-    this.setState({filter: value}); 
-};
+  handleLoadMore = (prevState) => {
+    this.setState(prevState => ({
+      currentPage: prevState.currentPage +1,
+    }))
+  };
+
   render() {
-    const { filter, contacts } = this.state;
-    const filterContacts = contacts.filter(contact =>
-      contact.name.toLowerCase().includes(filter.toLowerCase())
-    );
+    const { items, isLoading, currentPage, totalHits } = this.state;
+    const totalPages = totalHits / pageSize;
     return (
-      <div className={classes.wrapper}>
-        <div className={classes.container}>
-            <h1 className={classes.title}>PhoneBook</h1>
-            <ContactForm onSubmit={this.handleSubmit} />
-        </div>
-        <div className={classes.container}>
-          <h2 className={classes.title}>Contacts</h2>
-          <Filter onHandleFilter={this.handleFilter} />
-          <ContactList
-            contacts={filterContacts}
-            onDelete={this.handlerDelete}
-            />
-        </div>
-      </div>
+      <div className={classes.container}>
+        <SearchBar onSubmit={this.handleSubmit} loading={isLoading} />
+        {items ? <ImageGallery items={items} /> : 'Please try to enter another name'}
+        {totalPages > currentPage && <Button onClick={this.handleLoadMore} />}
+        <ToastContainer  autoClose={2000} />
+      </div> 
     )
   }
 }
